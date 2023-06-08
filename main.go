@@ -5,8 +5,54 @@ import (
 	"net"
 	"strings"
 	"errors"
+	"https://github.com/golang-jwt/jwt"
+	"https://github.com/google/uuid"
 )
 
+// defininig jwt secret key in global scope
+var jwtSecret = []byte("secret")
+
+func generateToken(data map[string]interface{}) (string, error)  {
+	claims := jwt.MapClaims{
+		"data": data,
+		"exp": time.Now().Add(time.Hour * 24).Unix(),
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	signedToken, err := token.SignedString(jwtSecret)
+	if err != nill {
+		return "", err
+	}
+
+	return signedToken, nil
+}
+
+func parseToken(tokenString string) (map[string]interface{}, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+
+	if err != nill {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok || !token.Valid {
+		return nil, errors.New("Invalid token")
+	}
+
+	data:= claims["data"].(map[string]interface{})
+	return data, nil
+}
+
+func generateSessionID() string {
+	uuid, err := uuid.NewRandom()
+	if err != nil {
+		log.Println("Error generating session id:", err.Error())
+		return ""
+	}
+	return uuid.String()
+}
 // Handle each connection
 func handleConnection(conn net.Conn){
 	defer conn.Close()
@@ -31,6 +77,13 @@ func handleConnection(conn net.Conn){
 		return
 	}
 
+	// Handling root path
+	switch requestPath {
+		case "/": {
+
+		}
+	}
+
 	// Process headers
 	headers := make(map[string]string)
 	for _, headerLine := range headerLines {
@@ -46,7 +99,35 @@ func handleConnection(conn net.Conn){
 	switch requestPath {
 		case "/":
 			// Handle the root path
-			response := "HTTP/1.1 200 OK\r\n"
+			cookieHeader := "Set-Cookie: mycookie=abc123\r\n"
+
+			// Handle the root path
+			response: = "HTTP/1.1 200 OK\r\n"
+
+			// cookie data
+			cookieData := map[string]interface{}{
+				"username": "john",
+				"role": "admin",
+			}
+
+			// generate token
+			token, err := generateToken(cookieData)
+			if err != nil {
+				log.Println("Error generating token:", err.Error())
+				return
+			}
+			
+			// setting JWT token into a secure cookie
+
+			sessionID := generateSessionID()
+			cookie := http.Cookie{
+				Name: "sessionID",
+				Value: sessionID,
+				Path: "/",
+				HttpOnly: true,
+				Secure: true,
+			}
+
 			conn.Write([]byte(response))
 		case "/about":
 			// Handle the about path
